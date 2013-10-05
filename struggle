@@ -1,0 +1,87 @@
+#!/usr/bin/env ruby
+# struggle
+#
+# Command line Strava upload utility
+
+require 'io/console'
+require 'json'
+require 'mechanize'
+require 'yaml'
+
+class Struggle
+  # Strava URLs
+  LOGIN_URL='https://www.strava.com/login'
+  UPLOAD_URL='https://www.strava.com/upload/select'
+
+  def initialize
+    # Load user configuration file
+    conf_file = "#{Dir.home}/.config/struggle/conf.yml"
+    if File.exist? conf_file
+      @conf = YAML::load_file conf_file
+    else
+      @conf = {}
+    end
+  end
+
+  def upload(*files)
+    # Get email and password
+    if @conf['strava_email'].nil?
+      print "Strava email: "
+      @conf['strava_email'] = STDIN.gets.chomp
+    end
+
+    if @conf['strava_password'].nil?
+      print "Strava password: "
+      @conf['strava_password'] = STDIN.noecho(&:gets).chomp
+      puts
+    end
+
+    agent = Mechanize.new { |a| a.follow_meta_refresh = true }
+
+    agent.get(LOGIN_URL) do |login|
+      login.form_with(:action => '/session') do |form|
+        form['email'] = @conf['strava_email']
+        form['password'] = @conf['strava_password']
+      end.submit
+    end
+
+    files.each do |file|
+      begin
+        print "Processing #{file} ... "
+
+        agent.get(UPLOAD_URL) do |upload|
+          response = upload.form_with(:action => '/upload/files') do |form|
+            form.file_uploads.first.file_name = file
+          end.submit
+
+          res_hash = JSON.parse(response.body).first
+          if res_hash['workflow'] == 'Error'
+            puts "Error: #{res_hash['error']}"
+            if res_hash.has_key? 'duplicate_url'
+              puts "Duplicate URL: #{res_hash['duplicate_url']}"
+              puts "Duplicate Name: #{res_hash['duplicate_name']}"
+            end
+          elsif res_hash['workflow'] != 'Uploaded'
+            puts res_hash
+          else
+            puts 'Success.'
+          end
+        end
+      rescue => e
+        STDERR.puts "#{e.class}: #{e.message}\n#{e.backtrace}"
+      end
+    end
+  end
+end
+
+if ARGV.length < 1
+  puts "Usage: #$0 [activity-file] ..."
+  puts "Upload activities to Strava."
+  puts
+  puts "Activity files can be .tcx, .fit, or .gpx files 25MB or smaller."
+
+  exit 0
+end
+
+s = Struggle.new
+s.upload(*ARGV)
