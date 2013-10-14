@@ -1,5 +1,5 @@
 #!/usr/bin/env ruby
-# struggle
+# kampa
 #
 # Command line Strava upload utility
 
@@ -8,14 +8,14 @@ require 'json'
 require 'mechanize'
 require 'yaml'
 
-class Struggle
+class Kampa
   # Strava URLs
   LOGIN_URL='https://www.strava.com/login'
   UPLOAD_URL='https://www.strava.com/upload/select'
 
   def initialize
     # Load user configuration file
-    conf_file = "#{Dir.home}/.config/struggle/conf.yml"
+    conf_file = "#{Dir.home}/.config/kampa/conf.yml"
     if File.exist? conf_file
       @conf = YAML::load_file conf_file
     else
@@ -83,5 +83,5 @@ if ARGV.length < 1
   exit 0
 end
 
-s = Struggle.new
+s = Kampa.new
 s.upload(*ARGV)

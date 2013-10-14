@@ -1,4 +1,4 @@
-struggle
+kampa
 ========
 
 Command line Strava upload utility
@@ -15,7 +15,7 @@ Configuration
 -------------
 
 Email and password can be stored (at your own risk) in
-`~/.config/struggle/conf.yml`.
+`~/.config/kampa/conf.yml`.
 
     # conf.yml
     strava_username = joe_athlete
@@ -24,4 +24,4 @@ Email and password can be stored (at your own risk) in
 Usage
 -----
 
-    struggle [activity-file] ...
+    kampa [activity-file] ...
