@@ -1,74 +1,61 @@
 #!/usr/bin/env ruby
 # kampa
 #
-# Command line Strava upload utility
+# Command line activity file uploader
 
-require 'io/console'
+=begin
+---
+strava:
+  access_token: xxxxx
+garmin:
+  username: xxxxx
+  password: xxxxx
+=end
+
 require 'json'
-require 'mechanize'
 require 'yaml'
 
+# Load service files
+Dir[File.join(__dir__, 'services', '*.rb')].each do |service|
+  require service
+end
+
 class Kampa
-  # Strava URLs
-  LOGIN_URL='https://www.strava.com/login'
-  UPLOAD_URL='https://www.strava.com/upload/select'
+  include Services
 
   def initialize
     # Load user configuration file
     conf_file = "#{Dir.home}/.config/kampa/conf.yml"
     if File.exist? conf_file
-      @conf = YAML::load_file conf_file
+      @services = YAML::load_file conf_file
     else
-      @conf = {}
+      puts "Place access information in #{conf_file}"
+      exit 1
     end
   end
 
   def upload(*files)
-    # Get email and password
-    if @conf['strava_email'].nil?
-      print "Strava email: "
-      @conf['strava_email'] = STDIN.gets.chomp
+    # Make sure files exist
+    files.each do |f|
+      if not File.readable?(f)
+        STDERR.puts "Unable to open #{f} for reading. Aborting."
+        exit 2
+      end
     end
 
-    if @conf['strava_password'].nil?
-      print "Strava password: "
-      @conf['strava_password'] = STDIN.noecho(&:gets).chomp
-      puts
-    end
-
-    agent = Mechanize.new { |a| a.follow_meta_refresh = true }
-
-    agent.get(LOGIN_URL) do |login|
-      login.form_with(:action => '/session') do |form|
-        form['email'] = @conf['strava_email']
-        form['password'] = @conf['strava_password']
-      end.submit
-    end
-
-    files.each do |file|
+    # Upload to each service
+    @services.each do |service, conf|
       begin
-        print "Processing #{file} ... "
+        puts "Uploading to #{service}..."
 
-        agent.get(UPLOAD_URL) do |upload|
-          response = upload.form_with(:action => '/upload/files') do |form|
-            form.file_uploads.first.file_name = file
-          end.submit
+        send("upload_to_#{service}", files, conf)
 
-          res_hash = JSON.parse(response.body).first
-          if res_hash['workflow'] == 'Error'
-            puts "Error: #{res_hash['error']}"
-            if res_hash.has_key? 'duplicate_url'
-              puts "Duplicate URL: #{res_hash['duplicate_url']}"
-              puts "Duplicate Name: #{res_hash['duplicate_name']}"
-            end
-          elsif res_hash['workflow'] != 'Uploaded'
-            puts res_hash
-          else
-            puts 'Success.'
-          end
-        end
-      rescue => e
-        STDERR.puts "#{e.class}: #{e.message}\n#{e.backtrace}"
+        puts "Finished uploading to #{service}."
+      rescue => ex
+        puts ex
+
+        # Skip if errors occur
+        STDERR.puts "Unable to upload to #{service}, skipping."
       end
     end
   end
@@ -76,12 +63,11 @@ end
 
 if ARGV.length < 1
   puts "Usage: #$0 [activity-file] ..."
-  puts "Upload activities to Strava."
-  puts
-  puts "Activity files can be .tcx, .fit, or .gpx files 25MB or smaller."
+  puts "Upload activities to various services"
 
   exit 0
 end
 
-s = Kampa.new
-s.upload(*ARGV)
+Kampa.new.upload(*ARGV)
+
+# vim: set ft=ruby
