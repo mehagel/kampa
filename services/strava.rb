@@ -26,7 +26,7 @@ module Services
       res = Net::HTTP.start(upload_uri.host) { |http| http.request(req) }
       mesg = JSON.parse res.body
 
-      if res.code == "201" && !mesg['error'].nil?
+      if res.code == "201" && mesg['error'].nil?
         # Success
         # ID: mesg['id']]
 
